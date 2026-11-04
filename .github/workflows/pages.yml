@@ -1,0 +1,43 @@
+# The web version on GitHub Pages (https://hanclinto.github.io/blockout2-wasm/): the game as web/build.sh builds it,
+# with no score service, so its Hall of Fame is kept in the browser and Online Score has nothing to show (a site with
+# a score service turns it on; README.md).
+name: Web version (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container: emscripten/emsdk:3.1.74
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: make -f web/Makefile -j 4
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

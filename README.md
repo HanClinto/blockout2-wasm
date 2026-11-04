@@ -8,6 +8,9 @@ It's the 2.5 release (2014, [SourceForge](https://sourceforge.net/projects/block
 commit here is that release exactly as published, and every change to the game's own code since is inside
 `#ifdef __EMSCRIPTEN__`, so the desktop build is untouched. The original README is [README.txt](README.txt).
 
+**Play it: <https://hanclinto.github.io/blockout2-wasm/>** (built from `main` by GitHub Actions; scores stay in your
+browser there, as no score service is attached).
+
 *BlockOut® is a registered trademark of Kadon Enterprises, Inc., used by permission (see README.txt).*
 
 ## Building
