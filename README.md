@@ -43,7 +43,7 @@ and a card after each game that says what it did on the board. [web/blockout.js]
 
 | Attribute | |
 |---|---|
-| `data-scores-api="/scores/api"` | A score service with the API below: each game that counts (played from Start Game, not the Demo or a Practice) is sent to it as it ends, and its board is the Online Score page's first. A game that can't be sent waits in the browser and goes later. The Hall of Fame's name starts as the signed-in person's. |
+| `data-scores-api="/scores/api"` | A score service with the API below: each game that counts (played from Start Game, not the Demo or a Practice) is sent to it as it ends, and its board is the Online Score page's first. A game that can't be sent waits in the browser and goes later. A new Hall of Fame score goes in under the signed-in person's name with nothing to type (`/me`); without one, the game asks for a name as before. |
 | `data-scores-label="Family"` | That board's name in the game: "FAMILY SCORE [Flat Fun]". |
 | `data-world="/blockout/world"` | blockout.net's world scores, read-only, as another board: an address on your own site that passes `getscore.php` on to `https://www.blockout.net/blockout2/` (blockout.net doesn't let pages on other sites read it). |
 | `data-leaderboard`, `data-back` + `data-back-label`, `data-home` + `data-home-label` | Links in the top bar; Quit in the game goes to `data-back`. |

@@ -33,7 +33,8 @@ void PageHallOfFame::Prepare(int iParam,void *pParam) {
   strcpy(editText,"          ");
   editPos = 0;
 #ifdef __EMSCRIPTEN__
-  // The page knows who's playing (a sign-in): their name is there to keep or change
+  // The page knows who's playing (a sign-in): the score is theirs, recorded at once as Enter would, with no name to
+  // type. Without a name (no sign-in), it's asked for as before.
   const char *who = WebPlayerName();
   for(int i=0;who[i] && i<10;i++) {
     editText[i] = who[i];
@@ -44,6 +45,15 @@ void PageHallOfFame::Prepare(int iParam,void *pParam) {
   editCursor = FALSE;
   editScore = (SCOREREC *)pParam;
   mParent->GetSetup()->GetHighScore(allScore);
+
+#ifdef __EMSCRIPTEN__
+  if( editScore && editPos>0 ) {
+    strcpy(editScore->name,editText);
+    mParent->GetSetup()->SaveHighScore();
+    mParent->GetSetup()->GetHighScore(allScore);
+    editScore = NULL;
+  }
+#endif
 
   if( editScore ) {
     editMode = TRUE;

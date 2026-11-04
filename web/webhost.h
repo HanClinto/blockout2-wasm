@@ -28,7 +28,8 @@ void WebPersist(void);
 void WebGameStarted(void);
 void WebGameOver(const char *json);
 
-// Who's playing, for the Hall of Fame's name ("" if the page doesn't know). Up to 10 characters are used.
+// Who's playing ("" if the page doesn't know): a new Hall of Fame score is recorded under it without asking.
+// Up to 10 characters are used.
 const char *WebPlayerName(void);
 
 // Online Score: the board for a setup, in getscore.php's text format, from the page's chosen score service.
