@@ -6,6 +6,9 @@
 #ifndef WINDOWS
 #include <unistd.h>
 #endif
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 #undef LoadImage
 #include <CImage.h>
@@ -31,7 +34,9 @@ int GLApplication::SetVideoMode() {
 
   // Enable/Disable vertical blanking 
   // Work only at application startup
+#ifndef __EMSCRIPTEN__
   SDL_GL_SetAttribute(SDL_GL_SWAP_CONTROL,m_bVSync);
+#endif
 
   // Set the video mode
   Uint32 flags;
@@ -95,7 +100,7 @@ int GLApplication::Create(int width, int height, BOOL bFullScreen, BOOL bVSync )
   m_screenHeight = height;
   m_bWindowed = !bFullScreen;
   
-#ifndef WINDOWS
+#if !defined(WINDOWS) && !defined(__EMSCRIPTEN__)
   if( getenv("DISPLAY")==NULL ) {
     printf("Warning, DISPLAY not defined, it may not work.\n");
   }
@@ -169,27 +174,59 @@ int GLApplication::Resize( DWORD width, DWORD height ) {
 
 // -------------------------------------------
 
+#ifdef __EMSCRIPTEN__
+// The browser calls this once per frame (requestAnimationFrame) in place of Run()'s loop
+static void StepFrame(void *app) {
+  if( !((GLApplication *)app)->Step() ) emscripten_cancel_main_loop();
+}
+
+// A GL error ends the native game; in the browser it's reported (the first few) and play goes on
+static bool GLErrorFatal(GLenum err) {
+  static int reported = 0;
+  if( reported < 10 ) {
+    printf("OpenGL error 0x%04X\n", err);
+    reported++;
+  }
+  return false;
+}
+#else
+static bool GLErrorFatal(GLenum err) {
+  GLApplication::printGlError();
+  return true;
+}
+#endif
+
 int GLApplication::Run() {
-
-  SDL_Event event;
-
-  bool quit = false;
-  int  nbFrame = 0;
-  int  lastTick = 0;
-  int  lastFrTick = 0;
-  int  errCode;
-  int  fTick;
-  int  firstTick;
 
   m_fTime        = 0.0f;
   m_fElapsedTime = 0.0f;
   m_fFPS         = 0.0f;
+  nbFrame = 0;
   lastTick = lastFrTick = firstTick = SDL_GetTicks();
 
+#ifdef __EMSCRIPTEN__
+  emscripten_set_main_loop_arg(StepFrame, this, 0, 1);
+  return GL_OK;
+#endif
+
   //Wait for user exit
-  while( quit == false )
-  {
-     
+  while( Step() );
+
+  //Clean up
+  SDL_Quit();
+
+  return GL_OK;
+
+}
+
+bool GLApplication::Step() {
+
+  SDL_Event event;
+  bool quit = false;
+  int  errCode = GL_OK;
+  int  fTick;
+  GLenum glErr;
+
      //While there are events to handle
      while( SDL_PollEvent( &event ) ) {
        if( event.type == SDL_QUIT )
@@ -217,21 +254,16 @@ int GLApplication::Run() {
 
      if(!quit) errCode = FrameMove();
      if( !errCode ) quit = true;
-     if( glGetError() != GL_NO_ERROR ) { printGlError(); quit = true; }
+     if( (glErr = glGetError()) != GL_NO_ERROR && GLErrorFatal(glErr) ) quit = true;
 
      if(!quit) errCode = Render();
      if( !errCode ) quit = true;
-     if( glGetError() != GL_NO_ERROR ) { printGlError(); quit = true; }
+     if( (glErr = glGetError()) != GL_NO_ERROR && GLErrorFatal(glErr) ) quit = true;
 
      //Swap buffer
      SDL_GL_SwapBuffers();
-      
-  }
-  
-  //Clean up
-  SDL_Quit();
-  
-  return GL_OK;
+
+  return !quit;
 
 }
 

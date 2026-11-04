@@ -19,6 +19,9 @@
 
 #ifndef WINDOWS
 #include <unistd.h>
+#ifdef __EMSCRIPTEN__
+#include "../web/webhost.h"
+#endif
 #else
 extern void InitialiseWinsock();
 #endif
@@ -49,6 +52,10 @@ int main(int argc,char *argv[])
     
   // Create and start the application
   BlockOut *glApp = new BlockOut();
+#ifdef __EMSCRIPTEN__
+  // A page always opens in a window; the page's own button (or F1) goes full screen
+  glApp->theSetup.SetFullScreen(FALSE);
+#endif
     
   if (!glApp->Create(glApp->theSetup.GetWindowWidth(),
 	  glApp->theSetup.GetWindowHeight(),
@@ -80,6 +87,12 @@ BlockOut::BlockOut()
 int BlockOut::UpdateFullScreen()
 {
   int hr = GL_OK;
+
+#ifdef __EMSCRIPTEN__
+  // The page goes full screen (the browser wants it from a key or click handler; the page waits for the next one)
+  WebSetFullScreen(theSetup.GetFullScreen());
+  return hr;
+#endif
 
   if( m_bWindowed ) {
     if( theSetup.GetFullScreen() ) {
@@ -144,6 +157,11 @@ int BlockOut::FrameMove()
           mode = GAME_MODE;
           break;
         case 100: // Exit
+#ifdef __EMSCRIPTEN__
+          // Back to the page that opened the game; the game stays where it is if there's none
+          WebQuit();
+          break;
+#endif
           InvalidateDeviceObjects();
           BOOL fs = theSetup.GetFullScreen();
           if (fs) {
@@ -157,7 +175,12 @@ int BlockOut::FrameMove()
     case GAME_MODE:
 
       // Frame limiter
+#ifdef __EMSCRIPTEN__
+      // The browser paces frames (and sleeping here would freeze the page)
+      int toSleep = 0;
+#else
       int toSleep = (int)(theSetup.GetFrLimitTime()*1000.0f);
+#endif
       if( toSleep>0 ) {
         int elapsed = SDL_GetTicks() - lastSleepTime;
         toSleep -= elapsed;
@@ -369,6 +392,11 @@ int BlockOut::EventProc(SDL_Event *event)
   if( event->type == SDL_KEYDOWN )
   {
     int unicode = (event->key.keysym.unicode & 0x7F);
+#ifdef __EMSCRIPTEN__
+    // Emscripten's SDL gives keys that aren't characters (arrows, Page Up...) their key code as the character, as
+    // SDL on a desktop doesn't: ArrowLeft (80 | 1<<10) came through as 'P' and paused the game
+    if( event->key.keysym.unicode >= 0x80 || (event->key.keysym.sym & SDLK_SCANCODE_MASK) ) unicode = 0;
+#endif
     if( unicode ) {
       m_bKey[unicode] = 1;
     } else {

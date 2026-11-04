@@ -16,6 +16,9 @@
 */
 
 #include "SetupManager.h"
+#ifdef __EMSCRIPTEN__
+#include "../web/webhost.h"
+#endif
 #include <stdio.h>
 
 // Converts the 975 possible game configurations to 585 configurations.
@@ -700,6 +703,9 @@ void SetupManager::SaveHighScore() {
 
     }
     fclose(file);
+#ifdef __EMSCRIPTEN__
+    WebPersist();
+#endif
 
   }
 
@@ -748,6 +754,9 @@ void SetupManager::WriteSetup() {
 
     }
     fclose(file);
+#ifdef __EMSCRIPTEN__
+    WebPersist();
+#endif
 
   }
 

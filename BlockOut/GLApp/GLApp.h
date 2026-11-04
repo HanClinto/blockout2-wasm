@@ -89,6 +89,7 @@ public:
     virtual void Pause(BOOL bPause);
     virtual int  Resize(DWORD width, DWORD height);
     int   Run();
+    bool  Step(); // one frame of Run(); false to stop
 
     // Utils function
     static void SetMaterial(GLMATERIAL *mat);
@@ -103,6 +104,12 @@ private:
 
    int m_bitsPerPixel;
    char errMsg[512];
+
+   // Run()'s state, kept between frames for Step()
+   int  nbFrame;
+   int  lastTick;
+   int  lastFrTick;
+   int  firstTick;
 
 };
 

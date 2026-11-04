@@ -86,9 +86,12 @@ int Menu::Process(BYTE *keys,float fTime) {
   if( animEnded ) {
 
      // Limit frame 
+#ifndef __EMSCRIPTEN__
+    // (the browser paces frames, and sleeping would freeze the page)
     if( selPage != &controlsPage &&  selPage != &creditsPage ) {
       SDL_Delay(50);
     }
+#endif
     exitValue = selPage->Process(keys,fTime);
 
   } else {
