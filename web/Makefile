@@ -1,7 +1,8 @@
 # The web build of BlockOut II (Emscripten). Run through web/build.sh, which runs it in the emscripten/emsdk container;
 # or, with emsdk on the PATH, from the top of the repository: make -f web/Makefile -j8
 #
-# Output in build/web/: blockout.html, blockout.js, blockout.wasm, blockout.data (the art and sounds).
+# Output in build/web/: index.html (the page: web/shell.html), blockout.js (the page's code), scores.js (score
+# services), and the game: bl2.js, bl2.wasm, bl2.data (its art and sounds).
 
 EMCC     ?= emcc
 OUT      := build/web
@@ -35,7 +36,8 @@ GAME_FLAGS := $(COMMON) $(CXXSTD) -I$(SDL_INC) -IImageLib/src -IBlockOut -includ
 IMG_FLAGS  := $(COMMON) -IImageLib/src
 
 LDFLAGS  := -O2 -sLEGACY_GL_EMULATION=1 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -lidbfs.js \
-	-sEXPORTED_RUNTIME_METHODS=FS,ENV,addRunDependency,removeRunDependency \
+	-sEXPORTED_RUNTIME_METHODS=FS,ENV,addRunDependency,removeRunDependency,ccall,stringToNewUTF8,UTF8ToString \
+	-sEXPORTED_FUNCTIONS=_main,_malloc,_free,_web_pause \
 	--pre-js web/pre.js \
 	--preload-file images@/bl2/images --preload-file sounds@/bl2/sounds \
 	--shell-file web/shell.html
@@ -45,11 +47,16 @@ GAME_OBJ := $(foreach f,$(GAME_SRC),$(call obj,$(f)))
 IMG_OBJ  := $(foreach f,$(IMG_SRC),$(call obj,$(f)))
 WEB_OBJ  := $(foreach f,$(WEB_SRC),$(call obj,$(f)))
 
-all: $(OUT)/blockout.html
+all: $(OUT)/index.html $(OUT)/blockout.js $(OUT)/scores.js
 
-$(OUT)/blockout.html: $(GAME_OBJ) $(IMG_OBJ) $(WEB_OBJ) web/pre.js web/shell.html $(wildcard images/* sounds/*)
+$(OUT)/index.html: $(GAME_OBJ) $(IMG_OBJ) $(WEB_OBJ) web/pre.js web/shell.html $(wildcard images/* sounds/*)
 	@mkdir -p $(OUT)
-	$(EMCC) $(GAME_OBJ) $(IMG_OBJ) $(WEB_OBJ) $(LDFLAGS) -o $@
+	$(EMCC) $(GAME_OBJ) $(IMG_OBJ) $(WEB_OBJ) $(LDFLAGS) -o $(OUT)/bl2.html
+	mv $(OUT)/bl2.html $@
+
+$(OUT)/%.js: web/%.js
+	@mkdir -p $(OUT)
+	cp $< $@
 
 $(OBJDIR)/BlockOut/%.o: BlockOut/%.cpp web/glcompat.h
 	@mkdir -p $(dir $@)

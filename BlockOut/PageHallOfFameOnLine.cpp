@@ -16,6 +16,9 @@
 */
 
 #include "Menu.h"
+#ifdef __EMSCRIPTEN__
+#include "../web/webhost.h"
+#endif
 
 
 
@@ -56,11 +59,27 @@ void PageHallOfFameOnLine::DownloadScore() {
     mParent->GetSetup()->GetHttpHome() ,
     mParent->GetSetup()->GetId() );
 
+#ifdef __EMSCRIPTEN__
+  // The page fetches the scores (from whichever score service is chosen) and answers in getscore.php's format.
+  // Until it does, "Downloading..." stays up.
+  int pending = 0;
+  char *page = WebScoresGet( mParent->GetSetup()->GetId() , &pending );
+  if( pending ) {
+    downloadState = 2;
+    return;
+  }
+#else
   char *page = mParent->GetHttp()->Get( link , timeout );
+#endif
   if( page==NULL ) {
 
     downloadState = -1;
+#ifdef __EMSCRIPTEN__
+    strncpy(errMsg,WebScoresError(),sizeof(errMsg)-1);
+    errMsg[sizeof(errMsg)-1] = 0;
+#else
     strcpy(errMsg,mParent->GetHttp()->GetError());
+#endif
 
   } else {
 
@@ -165,7 +184,12 @@ void PageHallOfFameOnLine::Render() {
 
   char tmp[256];
 
+#ifdef __EMSCRIPTEN__
+  // Which board: "FAMILY", "WORLD"... (Left and Right go through the page's score services)
+  sprintf(tmp,"%s SCORE %s",WebScoresLabel(),mParent->GetSetup()->GetName());
+#else
   sprintf(tmp,"SCORE %s",mParent->GetSetup()->GetName());
+#endif
   mParent->RenderTitle(tmp);
 
   // Online logo
@@ -181,6 +205,13 @@ void PageHallOfFameOnLine::Render() {
     // Download
     if( downloadState==1 ) 
       DownloadScore();
+
+#ifdef __EMSCRIPTEN__
+    if( downloadState>1 ) {
+      mParent->RenderText(0,0,FALSE,STR("Downloading..."));
+      return;
+    }
+#endif
 
     if( downloadState==0 ) {
 
@@ -250,6 +281,18 @@ int PageHallOfFameOnLine::Process(BYTE *keys,float fTime) {
     startPos = selItem-9;
   }
 
+
+#ifdef __EMSCRIPTEN__
+  if( keys[SDLK_LEFT] || keys[SDLK_RIGHT] ) {
+    if( downloadState<=1 && WebScoresSwitch(keys[SDLK_RIGHT] ? 1 : -1) ) {
+      selItem = 0;
+      startPos = 0;
+      downloadState = 3;
+    }
+    keys[SDLK_LEFT] = 0;
+    keys[SDLK_RIGHT] = 0;
+  }
+#endif
 
   if( keys[SDLK_RETURN] ) {
     mParent->ToPage(&mParent->scoreDetailsPage,selItem + 0x100,allScore + selItem);

@@ -37,6 +37,12 @@ class BlockOut : public GLApplication
     BOOL inited;
     int  mode;
     int  lastSleepTime;
+#ifdef __EMSCRIPTEN__
+    BOOL gameReported;   // the page has been told about the game that just ended
+    void ReportGame();
+  public:
+    void PauseGame();
+#endif
 
 protected:
     int OneTimeSceneInit();

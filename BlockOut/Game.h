@@ -64,6 +64,13 @@ class Game {
     // Set view matrix
     void SetViewMatrix(GLfloat *mView);
 
+#ifdef __EMSCRIPTEN__
+    // For the page (web build): a game that counts (not the demo or a practice) has ended, and the level it reached
+    BOOL IsCountedGameOver() { return gameMode==GAME_OVER && !demoFlag && !practiceFlag; }
+    int  GetLevel() { return level; }
+    BOOL IsPlaying() { return gameMode==GAME_PLAYING; }
+#endif
+
 
     GLFont2D *pFont;
 

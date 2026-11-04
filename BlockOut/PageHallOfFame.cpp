@@ -16,6 +16,9 @@
 */
 
 #include "Menu.h"
+#ifdef __EMSCRIPTEN__
+#include "../web/webhost.h"
+#endif
 
 
 
@@ -29,6 +32,14 @@ void PageHallOfFame::Prepare(int iParam,void *pParam) {
 
   strcpy(editText,"          ");
   editPos = 0;
+#ifdef __EMSCRIPTEN__
+  // The page knows who's playing (a sign-in): their name is there to keep or change
+  const char *who = WebPlayerName();
+  for(int i=0;who[i] && i<10;i++) {
+    editText[i] = who[i];
+    editPos = i+1;
+  }
+#endif
   startEditTime = 0.0f;
   editCursor = FALSE;
   editScore = (SCOREREC *)pParam;

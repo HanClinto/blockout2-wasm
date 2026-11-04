@@ -20,7 +20,9 @@
 #ifndef WINDOWS
 #include <unistd.h>
 #ifdef __EMSCRIPTEN__
+#include <emscripten.h>
 #include "../web/webhost.h"
+static class BlockOut *theApp = NULL;  // for the page's calls (web_pause)
 #endif
 #else
 extern void InitialiseWinsock();
@@ -53,8 +55,11 @@ int main(int argc,char *argv[])
   // Create and start the application
   BlockOut *glApp = new BlockOut();
 #ifdef __EMSCRIPTEN__
-  // A page always opens in a window; the page's own button (or F1) goes full screen
+  // A page always opens in a window; the page's own button (or F1) goes full screen. The page picks the resolution
+  // that fits its screen.
   glApp->theSetup.SetFullScreen(FALSE);
+  glApp->theSetup.SetWindowSize(WebWindowSize(glApp->theSetup.GetWindowSize()));
+  theApp = glApp;
 #endif
     
   if (!glApp->Create(glApp->theSetup.GetWindowWidth(),
@@ -68,6 +73,22 @@ int main(int argc,char *argv[])
   return glApp->Run();
 }
 
+#ifdef __EMSCRIPTEN__
+//-----------------------------------------------------------------------------
+// Name: web_pause()
+// Desc: The page pauses a game in play (when its tab is hidden), as P does.
+//-----------------------------------------------------------------------------
+extern "C" EMSCRIPTEN_KEEPALIVE void web_pause()
+{
+  if( theApp ) theApp->PauseGame();
+}
+
+void BlockOut::PauseGame()
+{
+  if( mode==GAME_MODE && theGame.IsPlaying() ) m_bKey['p'] = 1;
+}
+#endif
+
 //-----------------------------------------------------------------------------
 // Name: BlockOut()
 // Desc: Application constructor. Sets attributes for the app.
@@ -76,6 +97,9 @@ BlockOut::BlockOut()
 {
   inited = FALSE;
   mode = MENU_MODE;
+#ifdef __EMSCRIPTEN__
+  gameReported = TRUE;
+#endif
   m_strWindowTitle = STR(APP_VERSION);
   ZeroMemory( m_bKey, sizeof(m_bKey) );
 }
@@ -140,6 +164,10 @@ int BlockOut::FrameMove()
         case 1: // Switch to game mode
           ZeroMemory( m_bKey, sizeof(m_bKey) );
           theGame.StartGame(m_screenWidth,m_screenHeight,m_fTime);
+#ifdef __EMSCRIPTEN__
+          gameReported = FALSE;
+          WebGameStarted();
+#endif
           mode = GAME_MODE;
           break;
         case 2: // Resize
@@ -193,6 +221,13 @@ int BlockOut::FrameMove()
       }
 
       retValue = theGame.Process(m_bKey,m_fTime);
+#ifdef __EMSCRIPTEN__
+      // Told as the game ends (not when the player leaves the Game Over screen, which they might never do)
+      if( theGame.IsCountedGameOver() && !gameReported ) {
+        ReportGame();
+        gameReported = TRUE;
+      }
+#endif
 
       switch( retValue ) {
         case 1: {
@@ -226,6 +261,27 @@ int BlockOut::FrameMove()
 
   return GL_OK;
 }
+
+#ifdef __EMSCRIPTEN__
+//-----------------------------------------------------------------------------
+// Name: ReportGame()
+// Desc: Tell the page about the game that just ended (web build): it sends it to
+//       the score service. The setup id is the one BlockOut's online scores use.
+//-----------------------------------------------------------------------------
+void BlockOut::ReportGame()
+{
+  SCOREREC *s = theGame.GetScore();
+  char json[512];
+  sprintf(json,
+    "{\"setupId\":%d,\"pit\":[%d,%d,%d],\"blockSet\":%d,\"score\":%d,\"cubes\":%d,"
+    "\"lines\":[%d,%d,%d,%d,%d],\"emptyPits\":%d,\"startLevel\":%d,\"level\":%d,"
+    "\"seconds\":%.1f,\"date\":%u}",
+    theSetup.GetId(), theSetup.GetPitWidth(), theSetup.GetPitHeight(), theSetup.GetPitDepth(),
+    theSetup.GetBlockSet(), s->score, s->nbCube, s->nbLine1, s->nbLine2, s->nbLine3, s->nbLine4,
+    s->nbLine5, (int)s->emptyPit, s->startLevel, theGame.GetLevel(), s->gameTime, s->date);
+  WebGameOver(json);
+}
+#endif
 
 //-----------------------------------------------------------------------------
 // Name: Render()

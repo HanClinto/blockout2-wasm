@@ -2,35 +2,101 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#11141a">
 <title>BlockOut II</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M3 8l9-5 9 5v8l-9 5-9-5z' fill='%23d22'/><path d='M3 8l9 5 9-5M12 13v8' stroke='%23fff' stroke-width='1.2' fill='none'/></svg>">
+<!--
+  BlockOut II (Jean-Luc Pons, GPL) in the browser: the game itself compiled to WebAssembly (web/README.md).
+  The page around it is web/blockout.js; score services are web/scores.js.
+-->
 <style>
-  html, body { margin: 0; height: 100%; background: #000; color: #ccc; font: 14px system-ui, sans-serif; }
-  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-  canvas { display: block; max-width: 100vw; max-height: 100vh; aspect-ratio: 4 / 3; image-rendering: auto; outline: none; }
-  #status { position: fixed; left: 0; right: 0; bottom: 12px; text-align: center; }
+  :root { --bar: #11141a; --text: #e8ebf0; --muted: #9aa3b2; --accent: #ff5a4f; --ok: #6fd08c; --warn: #ffb86b; --line: #262b35; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--text);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  [hidden] { display: none !important; }
+  .bar { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 8px 14px; background: var(--bar);
+    border-bottom: 1px solid var(--line); padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+  .bar a { color: var(--text); text-decoration: none; }
+  .bar a:hover { color: var(--accent); }
+  .bar .title { font-weight: 700; letter-spacing: .01em; }
+  .bar .status { color: var(--muted); font-size: 13px; }
+  .bar .status.warn { color: var(--warn); }
+  .bar .status.ok { color: var(--ok); }
+  .bar .spacer { flex: 1; }
+  .bar button { font: inherit; color: var(--text); background: #232835; border: 1px solid var(--line); border-radius: 8px;
+    padding: 5px 12px; cursor: pointer; }
+  .bar button:hover:not(:disabled) { border-color: var(--accent); }
+  .bar button:disabled { opacity: .45; cursor: default; }
+  .stage { flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; background: #000; }
+  /* The game's 4:3 screen, as large as fits */
+  #canvas { display: block; width: min(100%, calc((100vh - 96px) * 4 / 3)); width: min(100%, calc((100dvh - 96px) * 4 / 3));
+    aspect-ratio: 4 / 3; outline: none; background: #000; }
+  .stage:fullscreen #canvas { width: min(100vw, calc(100vh * 4 / 3)); }
+  .hint { padding: 6px 14px; background: var(--bar); color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); }
+  .hint b, .help kbd { color: var(--text); font-weight: 600; }
+  kbd { font: 600 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 5px; border: 1px solid var(--line);
+    border-bottom-width: 2px; border-radius: 4px; background: #1b1f29; }
+  /* After a game: what it did on the board, and any achievements */
+  .card { position: absolute; top: 14px; right: 14px; max-width: min(360px, calc(100% - 28px)); background: rgba(17, 20, 26, .94);
+    border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 12px 14px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .5); cursor: pointer; transition: opacity .35s, transform .35s; }
+  .card.gone { opacity: 0; transform: translateY(-8px); }
+  .card .unlock { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .card .icon { font-size: 22px; line-height: 1; }
+  .card .more { color: var(--muted); font-size: 13px; }
+  .card a { color: var(--accent); }
+  /* How to play */
+  .help { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px;
+    background: rgba(0, 0, 0, .72); overflow: auto; }
+  .help .box { max-width: 560px; width: 100%; background: var(--bar); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; }
+  .help h2 { margin: 0 0 6px; font-size: 20px; }
+  .help p { margin: 0 0 12px; color: var(--muted); }
+  .help table { border-collapse: collapse; width: 100%; margin: 4px 0 14px; }
+  .help td { padding: 5px 0; vertical-align: top; }
+  .help td:first-child { white-space: nowrap; padding-right: 14px; }
+  .help button { font: inherit; color: #1b0605; background: var(--accent); border: 0; border-radius: 8px; padding: 8px 16px;
+    font-weight: 600; cursor: pointer; }
 </style>
 </head>
 <body>
-<div id="stage"><canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas></div>
-<div id="status">Loading…</div>
-<script>
-  var statusEl = document.getElementById('status');
-  var Module = {
-    canvas: document.getElementById('canvas'),
-    print: function (t) { console.log(t); },
-    printErr: function (t) { console.warn(t); },
-    setStatus: function (t) { statusEl.textContent = t; statusEl.hidden = !t; },
-    onRuntimeInitialized: function () { Module.canvas.focus(); },
-    blockout: {
-      setFullScreen: function (on) {
-        if (on && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(function () {});
-        if (!on && document.fullscreenElement) document.exitFullscreen();
-      },
-      quit: function () { history.length > 1 ? history.back() : null; }
-    }
-  };
-</script>
+<div class="bar">
+  <a id="back" hidden>‹ Back</a>
+  <span class="title">BlockOut II</span>
+  <span class="status" id="status"></span>
+  <span class="spacer"></span>
+  <a id="leaderboard" hidden>Leaderboard</a>
+  <button type="button" id="howto">How to play</button>
+  <button type="button" id="fullscreen">Full screen</button>
+  <a id="home" hidden>Home</a>
+</div>
+<div class="stage" id="stage">
+  <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+  <div class="card" id="card" hidden></div>
+  <div class="help" id="help" hidden>
+    <div class="box">
+      <h2>How to play</h2>
+      <p>Blocks fall into a pit you look down into. Fill a whole layer and it disappears; the game ends when the pit fills up.
+        Clearing several layers at once, and emptying the pit, scores the most.</p>
+      <table>
+        <tr><td><kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd></td><td>Move the block</td></tr>
+        <tr><td><kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd></td><td>Turn it around each axis (<kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> the other way); <i>Options › Controls</i> changes them</td></tr>
+        <tr><td><kbd>Space</kbd></td><td>Drop it</td></tr>
+        <tr><td><kbd>P</kbd></td><td>Pause (the game also pauses when you switch tabs)</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Leave the game, or go back in the menus</td></tr>
+        <tr><td><kbd>F1</kbd></td><td>Full screen</td></tr>
+      </table>
+      <p><b>Choose Setup</b> picks the pit: the classic <b>Flat Fun</b>, <b>3D Mania</b> and <b>Out of Control</b>, or any size
+        you like. Each pit has its own high scores; <b>Online Score</b> shows them (<kbd>←</kbd> <kbd>→</kbd> switch boards).</p>
+      <button type="button" class="close">Play</button>
+    </div>
+  </div>
+</div>
+<div class="hint"><b>Arrows</b> move · <b>Q W E</b> / <b>A S D</b> turn · <b>Space</b> drops · <b>P</b> pauses · <b>Esc</b> menu</div>
+<script src="scores.js"></script>
+<script src="blockout.js"></script>
 {{{ SCRIPT }}}
 </body>
 </html>
